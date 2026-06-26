@@ -240,11 +240,11 @@ test("annotation card title renders selected tag as an html element name", () =>
   assert.match(js, /"Annotate &lt;" \+ c\.tag \+ "&gt;"/);
 });
 
-test("annotation card shadow styles use Lavish design-system variables", () => {
+test("annotation card shadow styles use the Catppuccin Mocha design tokens", () => {
   const js = createSdkJs("abc");
 
-  assert.match(js, /--ink-900:#1e1e2e/); // Base — main background
-  assert.match(js, /--accent:#cba6f7/); // Mauve
+  assert.match(js, /--ctp-base:#1e1e2e/); // Base — main background
+  assert.match(js, /--accent:var\(--ctp-mauve\)/); // Mauve accent
   assert.match(js, /--font-sans:/);
   assert.match(js, /font-family:var\(--font-sans\)/);
   assert.match(js, /:focus-visible\{outline:2px solid var\(--accent\);outline-offset:2px/);
@@ -303,7 +303,7 @@ test("artifact SDK uses design-token aliases for annotation highlight and shadow
   assert.match(js, /--lavish-annotate-outline:2px solid var\(--lavish-accent\)/);
   assert.match(js, /el\.style\.outline\s*=\s*["']var\(--lavish-annotate-outline,2px solid #cba6f7\)["']/);
   assert.match(js, /el\.style\.outlineOffset\s*=\s*["']var\(--lavish-annotate-offset,2px\)["']/);
-  assert.match(js, /--fg-faint:var\(--steel-300\)/);
+  assert.match(js, /--fg-faint:var\(--ctp-overlay2\)/);
   assert.match(js, /textarea::placeholder\{color:var\(--fg-faint\)\}/);
   assert.doesNotMatch(js, /placeholder\{color:#aeb6c6\}/);
 });
@@ -661,7 +661,7 @@ test("chrome waits for the replacement server before version-driven reload", asy
 test("chrome restores queued prompts from tab storage after reload", async () => {
   const js = await chromeClientSource();
 
-  assert.match(js, /lavish-axi:queued:/);
+  assert.match(js, /lavish:queued:/);
   assert.match(js, /function loadQueuedPrompts\(\)/);
   assert.match(js, /const queued = loadQueuedPrompts\(\)/);
   assert.match(js, /sessionStorage\.getItem\(queueStorageKey\)/);

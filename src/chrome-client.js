@@ -4,7 +4,7 @@ const sessionDataElement = document.getElementById("lavish-session");
 const sessionData = JSON.parse(sessionDataElement?.textContent || "{}");
 const key = String(sessionData.key || "");
 const filePath = String(sessionData.file || "");
-const queueStorageKey = "lavish-axi:queued:" + key;
+const queueStorageKey = "lavish:queued:" + key;
 const internalQueueKeyField = "_lavishQueueKey";
 
 const frame = /** @type {HTMLIFrameElement} */ (document.getElementById("artifact"));

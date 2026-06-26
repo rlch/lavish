@@ -35,7 +35,7 @@ const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60_000;
 
 // A detached server should not live forever. When no browser chrome (SSE) and no agent poll
 // are connected for this long, the server shuts itself down so it stops dangling. The next
-// `lavish-axi <file>` invocation re-spawns a fresh server and adopts the session from
+// `lavish <file>` invocation re-spawns a fresh server and adopts the session from
 // state.json. Set LAVISH_AXI_IDLE_TIMEOUT_MS to 0/off to disable, or to a custom millisecond
 // budget.
 export function resolveIdleTimeoutMs(env = process.env) {
@@ -73,7 +73,7 @@ export async function serve({
   app.use(express.json({ limit: "2mb" }));
 
   app.get("/health", (req, res) => {
-    res.json({ ok: true, app: "lavish-axi", version });
+    res.json({ ok: true, app: "lavish", version });
   });
 
   let shutdownResolve;
@@ -535,7 +535,7 @@ export async function resolveWatchTarget(session) {
         scope: "directory",
         options: {
           ...baseOptions,
-          ignored: /(^|[/\\])(\.git|node_modules|dist|build|\.lavish-axi)([/\\]|$)/,
+          ignored: /(^|[/\\])(\.git|node_modules|dist|build|\.lavish)([/\\]|$)/,
         },
       };
     }

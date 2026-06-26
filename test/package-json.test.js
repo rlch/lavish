@@ -12,24 +12,19 @@ test("check script runs all verification commands", async () => {
     "npm run format:check",
     "npm run typecheck",
     "npm test",
-    "node scripts/build-skill.js --check",
   ]);
 });
 
-test("installable skill stays in sync with the no-args home output", async () => {
-  const { createSkillMarkdown } = await import("../src/skill.js");
-  const committed = await readFile(new URL("../skills/lavish/SKILL.md", import.meta.url), "utf8");
-
-  assert.equal(committed, createSkillMarkdown(), "run `npm run build:skill` and commit the result");
-});
-
-test("published package includes the installable skill", async () => {
+test("package is the owned @rlch/lavish, private, with a `lavish` bin", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-  assert.ok(packageJson.files.includes("skills/lavish"));
+  assert.equal(packageJson.name, "@rlch/lavish");
+  assert.equal(packageJson.private, true);
+  assert.equal(packageJson.bin.lavish, "dist/cli.mjs");
+  assert.ok(packageJson.files.includes("dist"));
 });
 
-test("build copies local design assets for published artifact injection", async () => {
+test("build copies local design assets for artifact injection", async () => {
   const buildScript = await readFile(new URL("../scripts/build.js", import.meta.url), "utf8");
 
   assert.match(buildScript, /daisyui\.css/);
@@ -37,40 +32,16 @@ test("build copies local design assets for published artifact injection", async 
   assert.match(buildScript, /tailwindcss-browser\.js/);
 });
 
-test("package metadata matches the GitHub repository used for npm provenance", async () => {
+test("package metadata points at the rlch/lavish repository", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-  assert.equal(packageJson.repository.url, "git+https://github.com/kunchenguid/lavish-axi.git");
-  assert.equal(packageJson.bugs.url, "https://github.com/kunchenguid/lavish-axi/issues");
-  assert.equal(packageJson.homepage, "https://github.com/kunchenguid/lavish-axi#readme");
+  assert.equal(packageJson.repository.url, "git+https://github.com/rlch/lavish.git");
+  assert.equal(packageJson.bugs.url, "https://github.com/rlch/lavish/issues");
+  assert.equal(packageJson.homepage, "https://github.com/rlch/lavish#readme");
 });
 
-test("pnpm lock root importer matches the publish manifest", async () => {
-  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-  const pnpmLock = await readFile(new URL("../pnpm-lock.yaml", import.meta.url), "utf8");
+test("no telemetry env remains in the build", async () => {
+  const buildScript = await readFile(new URL("../scripts/build.js", import.meta.url), "utf8");
 
-  for (const [name, specifier] of Object.entries(packageJson.dependencies)) {
-    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const escapedSpecifier = specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-    assert.match(pnpmLock, new RegExp(`["']?${escapedName}["']?:[\\s\\S]*?specifier: ${escapedSpecifier}`));
-  }
-});
-
-test("release workflow publishes from the release tag checkout", async () => {
-  const workflow = await readFile(new URL("../.github/workflows/release-please.yml", import.meta.url), "utf8");
-
-  assert.match(
-    workflow,
-    /uses: actions\/checkout@v6\n\s+if: \$\{\{ steps\.release\.outputs\.release_created \}\}\n\s+with:\n\s+ref: \$\{\{ steps\.release\.outputs\.tag_name \}\}/,
-  );
-});
-
-test("release workflow keeps telemetry env during npm publish prepack", async () => {
-  const workflow = await readFile(new URL("../.github/workflows/release-please.yml", import.meta.url), "utf8");
-
-  assert.match(
-    workflow,
-    /run: npm publish --access public --provenance\n\s+if: \$\{\{ steps\.release\.outputs\.release_created \}\}\n\s+env:\n\s+LAVISH_AXI_UMAMI_HOST: https:\/\/a\.kunchenguid\.com\n\s+LAVISH_AXI_UMAMI_WEBSITE_ID: \$\{\{ vars\.LAVISH_AXI_UMAMI_WEBSITE_ID \}\}/,
-  );
+  assert.doesNotMatch(buildScript, /UMAMI/i);
 });
