@@ -6,12 +6,12 @@ const key = String(sessionData.key || "");
 const filePath = String(sessionData.file || "");
 const queueStorageKey = "lavish-axi:queued:" + key;
 const internalQueueKeyField = "_lavishQueueKey";
-const initialChat = Array.isArray(sessionData.initialChat) ? sessionData.initialChat : [];
 
 const frame = /** @type {HTMLIFrameElement} */ (document.getElementById("artifact"));
+const dock = /** @type {HTMLDivElement} */ (document.getElementById("dock"));
+const dockCount = /** @type {HTMLSpanElement} */ (document.getElementById("dockCount"));
+const sentToast = /** @type {HTMLDivElement} */ (document.getElementById("sentToast"));
 const annotationPills = /** @type {HTMLDivElement} */ (document.getElementById("annotationPills"));
-const chatLog = /** @type {HTMLDivElement} */ (document.getElementById("chatLog"));
-const chatInput = /** @type {HTMLTextAreaElement} */ (document.getElementById("chatInput"));
 const sendButton = /** @type {HTMLButtonElement} */ (document.getElementById("send"));
 const sendCaret = /** @type {HTMLButtonElement} */ (document.getElementById("sendCaret"));
 const sendActions = /** @type {HTMLDivElement} */ (document.getElementById("sendActions"));
@@ -28,7 +28,6 @@ const endButton = /** @type {HTMLButtonElement} */ (document.getElementById("end
 const copyPathButton = /** @type {HTMLButtonElement} */ (document.getElementById("copyPath"));
 const copyHint = /** @type {HTMLSpanElement} */ (document.getElementById("copyHint"));
 const copyHintText = /** @type {HTMLSpanElement} */ (document.getElementById("copyHintText"));
-const presenceBanner = /** @type {HTMLDivElement} */ (document.getElementById("presenceBanner"));
 const endedOverlay = /** @type {HTMLDivElement} */ (document.getElementById("endedOverlay"));
 const layoutGateOverlay = /** @type {HTMLDivElement} */ (document.getElementById("layoutGateOverlay"));
 const layoutGateTitle = /** @type {HTMLDivElement} */ (document.getElementById("layoutGateTitle"));
@@ -41,7 +40,6 @@ const artifactSrc = frame.dataset.artifactSrc || frame.getAttribute?.("data-arti
 const queued = loadQueuedPrompts();
 let annotation = true;
 let ended = false;
-let agentPresence = "waiting";
 let pendingSnapshot = "";
 const layoutGateEnabled = sessionData.layoutGateEnabled !== false;
 const configuredLayoutGateMaxHoldMs = Number(sessionData.layoutGateMaxHoldMs);
@@ -57,7 +55,6 @@ let layoutGateCycle = 0;
 let layoutGateTimer;
 const snapshotRequests = [];
 let endAfterSubmit = false;
-let workingBubble = null;
 let submitQueuedPromise = null;
 let submitQueuedAgain = false;
 let lastScroll = { x: 0, y: 0 };
@@ -65,6 +62,8 @@ let lastScroll = { x: 0, y: 0 };
 let copyHintTimer;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let sendHintTimer;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let sentToastTimer;
 
 function escapeHtml(value) {
   return String(value).replace(
@@ -126,12 +125,21 @@ function render() {
     closeButton.addEventListener("click", (event) => removeQueuedPrompt(Number(closeButton.dataset.index), event));
   }
   updateSendState();
+  updateDock();
 }
 
 function updateSendState() {
-  sendButton.disabled = ended || agentPresence === "working";
-  sendCaret.disabled = ended || agentPresence === "working";
+  sendButton.disabled = ended;
+  sendCaret.disabled = ended;
   sendFromMenuButton.disabled = sendButton.disabled;
+}
+
+// The dock is a floating surface that only appears while there is queued feedback to send,
+// so the artifact gets the full width until the user actually annotates something.
+function updateDock() {
+  const count = queued.length;
+  dockCount.textContent = count === 1 ? "1 queued annotation" : count + " queued annotations";
+  dock.hidden = ended || count === 0;
 }
 
 function showSendHint() {
@@ -140,12 +148,23 @@ function showSendHint() {
   sendHintTimer = setTimeout(() => {
     sendHint.hidden = true;
   }, 2600);
-  chatInput.focus();
 }
 
 function hideSendHint() {
   clearTimeout(sendHintTimer);
   sendHint.hidden = true;
+}
+
+// The only post-send confirmation: a brief toast where the dock was, since there is no
+// conversation surface to acknowledge the submit.
+function showSentToast(count) {
+  if (!sentToast) return;
+  sentToast.textContent = "Sent " + count + (count === 1 ? " annotation" : " annotations") + " → back to your agent";
+  sentToast.hidden = false;
+  clearTimeout(sentToastTimer);
+  sentToastTimer = setTimeout(() => {
+    sentToast.hidden = true;
+  }, 2800);
 }
 
 function setMenuOpen(button, menu, open) {
@@ -182,46 +201,6 @@ async function copyText(text) {
   document.execCommand("copy");
   helper.remove();
   return true;
-}
-
-function addChat(role, text) {
-  if (!text) return;
-
-  const el = document.createElement("div");
-  el.className = "bubble " + role;
-  el.innerHTML = "<small>" + (role === "agent" ? "Agent" : "You") + "</small><div>" + escapeHtml(text) + "</div>";
-  chatLog.appendChild(el);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-function syncChat(chat) {
-  for (const el of [...chatLog.querySelectorAll(".bubble.user,.bubble.agent:not(.agent-working)")]) {
-    el.remove();
-  }
-
-  for (const item of chat) addChat(item.role, item.text);
-  if (workingBubble) chatLog.appendChild(workingBubble);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-function setAgentPresence(state) {
-  agentPresence = state === "listening" || state === "working" ? state : "waiting";
-  updateSendState();
-  if (presenceBanner) presenceBanner.hidden = ended || agentPresence !== "waiting";
-
-  if (agentPresence !== "working") {
-    if (workingBubble) workingBubble.remove();
-    workingBubble = null;
-    return;
-  }
-
-  if (!workingBubble) {
-    workingBubble = document.createElement("div");
-    workingBubble.className = "bubble agent agent-working";
-    workingBubble.innerHTML = '<span class="spinner"></span><span>Working...</span>';
-    chatLog.appendChild(workingBubble);
-  }
-  chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function removeQueuedPrompt(index, event) {
@@ -271,17 +250,9 @@ function requestSnapshot(action) {
 }
 
 function sendQueued(endAfter) {
-  if (ended || agentPresence === "working") return;
+  if (ended) return;
   closeMenus();
 
-  const text = chatInput.value.trim();
-  if (text) {
-    queued.push({ uid: "", prompt: text, selector: "", tag: "message", text: "Freeform message" });
-    persistQueuedPrompts();
-    addChat("user", text);
-    chatInput.value = "";
-    render();
-  }
   if (!queued.length) {
     if (endAfter) {
       endSession();
@@ -337,7 +308,7 @@ async function submitQueuedOnce() {
   }
   persistQueuedPrompts();
   render();
-  if (agentPresence === "listening") setAgentPresence("working");
+  if (!endAfterSubmit) showSentToast(prompts.length);
 }
 
 function normalizeLayoutWarningsPayload(value) {
@@ -464,9 +435,8 @@ async function endSession() {
   closeMenus();
   annotationSwitch.disabled = true;
   moreButton.disabled = true;
-  chatInput.disabled = true;
   updateSendState();
-  if (presenceBanner) presenceBanner.hidden = true;
+  dock.hidden = true;
   layoutGateManuallyBypassed = true;
   revealLayoutGate();
   postToFrame({ type: "lavish:setAnnotationMode", enabled: false });
@@ -565,13 +535,6 @@ sendFromMenuButton.onclick = () => sendQueued(false);
 sendAndEndButton.onclick = () => sendQueued(true);
 sendCaret.onclick = () => toggleMenu(sendCaret, sendMenu);
 moreButton.onclick = () => toggleMenu(moreButton, moreMenu);
-chatInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-    event.preventDefault();
-    sendQueued(false);
-  }
-});
-chatInput.addEventListener("input", hideSendHint);
 copyPathButton.onclick = copyFilePath;
 reloadArtifactButton.onclick = reloadArtifact;
 copySnapshotButton.onclick = copyDomSnapshot;
@@ -598,10 +561,5 @@ initializeLayoutGate();
 const events = new EventSource("/events/" + key);
 events.addEventListener("reload", () => resetFrame());
 events.addEventListener("chrome-reload", () => reloadAfterServerRestart());
-events.addEventListener("agent-reply", (event) => addChat("agent", JSON.parse(event.data).text));
-events.addEventListener("chat-sync", (event) => syncChat(JSON.parse(event.data).chat || []));
-events.addEventListener("agent-presence", (event) => setAgentPresence(JSON.parse(event.data).state));
 
 render();
-initialChat.forEach((item) => addChat(item.role, item.text));
-setAgentPresence("waiting");

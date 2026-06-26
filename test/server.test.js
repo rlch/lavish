@@ -243,19 +243,23 @@ test("annotation card title renders selected tag as an html element name", () =>
 test("annotation card shadow styles use Lavish design-system variables", () => {
   const js = createSdkJs("abc");
 
-  assert.match(js, /--ink-900:#0f1115/);
-  assert.match(js, /--accent:#f4c95d/);
+  assert.match(js, /--ink-900:#1e1e2e/); // Base — main background
+  assert.match(js, /--accent:#cba6f7/); // Mauve
   assert.match(js, /--font-sans:/);
   assert.match(js, /font-family:var\(--font-sans\)/);
   assert.match(js, /:focus-visible\{outline:2px solid var\(--accent\);outline-offset:2px/);
 });
 
-test("chrome top bar uses an Annotate switch instead of a labeled toggle button", () => {
+test("chrome floats an Annotate switch and the more menu in a top-right control cluster", () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
 
-  assert.match(html, /class="annotate-switch" id="annotation"[^>]*aria-pressed="true"/);
+  assert.match(html, /<div class="controls"><button class="annotate-switch" id="annotation"[^>]*aria-pressed="true"/);
   assert.match(html, /class="switch-track"/);
   assert.match(html, />Annotate</);
+  assert.match(html, /class="more-wrap" id="moreWrap"/);
+  // No top bar / branding anymore.
+  assert.doesNotMatch(html, /class="bar"/);
+  assert.doesNotMatch(html, /brand-mark/);
   assert.doesNotMatch(html, /Annotation: On/);
   assert.doesNotMatch(html, /Inspect/);
 });
@@ -269,12 +273,17 @@ test("annotate switch shows a brass track and ink knob when enabled", async () =
   assert.match(js, /annotationSwitch\.setAttribute\("aria-pressed", String\(annotation\)\)/);
 });
 
-test("chrome declares the Lavish design-system tokens", async () => {
+test("chrome declares the Catppuccin Mocha design-system tokens", async () => {
   const css = await chromeCssSource();
 
-  assert.match(css, /--ink-900:#0f1115/);
-  assert.match(css, /--cream-100:#f7f3ea/);
-  assert.match(css, /--brass-500:#f4c95d/);
+  assert.match(css, /--ctp-base:#1e1e2e/); // Base
+  assert.match(css, /--ctp-text:#cdd6f4/); // Text
+  assert.match(css, /--ctp-mauve:#cba6f7/); // Mauve (accent)
+  assert.match(css, /--ctp-green:#a6e3a1/);
+  assert.match(css, /--ctp-yellow:#f9e2af/);
+  // The critical role mapping: the main background is Base, not Crust.
+  assert.match(css, /--bg:var\(--ctp-base\)/);
+  assert.match(css, /--accent:var\(--ctp-mauve\)/);
   assert.match(css, /--font-serif:/);
   assert.match(css, /--font-sans:/);
   assert.match(css, /--text-display:92px/);
@@ -283,16 +292,16 @@ test("chrome declares the Lavish design-system tokens", async () => {
   assert.match(css, /--shadow-floating:0 20px 70px rgba\(0,0,0,.35\)/);
   assert.match(css, /--ease:cubic-bezier\(.2,.6,.2,1\)/);
   assert.match(css, /--dur-slow:320ms/);
-  assert.match(css, /--bar-h:56px/);
   assert.match(css, /--panel-w:360px/);
+  assert.doesNotMatch(css, /--bar-h:/);
 });
 
 test("artifact SDK uses design-token aliases for annotation highlight and shadow UI", () => {
   const js = createSdkJs("abc");
 
-  assert.match(js, /--lavish-accent:#f4c95d/);
+  assert.match(js, /--lavish-accent:#cba6f7/);
   assert.match(js, /--lavish-annotate-outline:2px solid var\(--lavish-accent\)/);
-  assert.match(js, /el\.style\.outline\s*=\s*["']var\(--lavish-annotate-outline,2px solid #f4c95d\)["']/);
+  assert.match(js, /el\.style\.outline\s*=\s*["']var\(--lavish-annotate-outline,2px solid #cba6f7\)["']/);
   assert.match(js, /el\.style\.outlineOffset\s*=\s*["']var\(--lavish-annotate-offset,2px\)["']/);
   assert.match(js, /--fg-faint:var\(--steel-300\)/);
   assert.match(js, /textarea::placeholder\{color:var\(--fg-faint\)\}/);
@@ -311,18 +320,19 @@ test("chrome keeps the editor usable on narrow screens", async () => {
   const css = await chromeCssSource();
 
   assert.match(css, /@media \(max-width:860px\)/);
-  assert.match(css, /grid-template-columns:1fr/);
-  assert.match(css, /grid-template-rows:minmax\(0,1fr\) min\(42vh,360px\)/);
+  // On narrow screens the dock spans the artifact width instead of a fixed right offset.
+  assert.match(css, /@media \(max-width:860px\)\{\.dock\{[^}]*left:var\(--space-8\)/);
+  assert.match(css, /@media \(max-width:860px\)\{\.dock\{[^}]*width:auto/);
 });
 
-test("chrome top bar follows the design mock wordmark and overflow menu treatment", async () => {
+test("chrome drops the wordmark and floats the overflow menu in the control cluster", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const css = await chromeCssSource();
 
-  assert.match(html, /class="brand-mark">Lavish/);
-  assert.match(html, /class="brand-support">Editor/);
-  assert.match(css, /font-family:var\(--font-serif\)/);
-  assert.match(css, /letter-spacing:\.18em/);
+  assert.doesNotMatch(html, /brand-mark/);
+  assert.doesNotMatch(html, /brand-support/);
+  assert.doesNotMatch(html, />Editor</);
+  assert.match(css, /\.controls\{[^}]*position:fixed/);
   assert.match(html, /class="more-button" id="moreButton"/);
   assert.match(html, /class="menu more-menu" id="moreMenu" hidden/);
   assert.doesNotMatch(html, /class="file-input"/);
@@ -412,22 +422,29 @@ test("clipboard copy falls back when navigator clipboard rejects", async () => {
   assert.doesNotMatch(js, /navigator\.clipboard\.writeText\(text\)\.catch/);
 });
 
-test("chrome centers the top bar row while bottom-aligning the identity cluster", async () => {
+test("chrome control cluster floats top-right over a full-height artifact, with no container bubble", async () => {
   const css = await chromeCssSource();
 
-  assert.match(css, /\.bar\{[^}]*align-items:center/);
-  assert.match(css, /\.brand\{[^}]*height:22px/);
-  assert.match(css, /\.brand\{[^}]*align-items:flex-end/);
+  assert.match(css, /\.controls\{[^}]*position:fixed/);
+  assert.match(css, /\.controls\{[^}]*top:var\(--space-8\)/);
+  assert.match(css, /\.controls\{[^}]*right:var\(--space-8\)/);
+  assert.match(css, /\.layout\{[^}]*height:100vh/);
+  // The cluster is bare — no background/border/shadow bubble around the switch + menu.
+  assert.doesNotMatch(css, /\.controls\{[^}]*background:/);
+  assert.doesNotMatch(css, /\.controls\{[^}]*box-shadow:/);
+  assert.doesNotMatch(css, /\.bar\{/);
+  assert.doesNotMatch(css, /\.brand\{/);
 });
 
-test("chrome chat bubbles follow the preview mock shades", async () => {
+test("chrome confirms a successful send with a transient toast", async () => {
+  const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
+  const js = await chromeClientSource();
   const css = await chromeCssSource();
 
-  assert.match(css, /\.bubble\.user\{[^}]*background:var\(--bg-elevated\)/);
-  assert.match(css, /\.bubble\.user\{[^}]*border-color:var\(--border-strong\)/);
-  assert.match(css, /\.bubble\.agent\{[^}]*background:transparent/);
-  assert.match(css, /\.bubble\.agent\{[^}]*border-color:var\(--border-subtle\)/);
-  assert.match(css, /border-top-color:var\(--accent\)/);
+  assert.match(html, /class="sent-toast" id="sentToast" hidden/);
+  assert.match(js, /function showSentToast\(/);
+  assert.match(js, /if \(!endAfterSubmit\) showSentToast\(prompts\.length\)/);
+  assert.match(css, /\.sent-toast\{/);
 });
 
 test("chrome queued-prompt pills use the preview mock steel treatment", async () => {
@@ -438,79 +455,66 @@ test("chrome queued-prompt pills use the preview mock steel treatment", async ()
   assert.doesNotMatch(css, /\.pill\{[^}]*var\(--amber/);
 });
 
-test("chrome includes a chat-like prompt composer and agent reply listener", async () => {
+test("chrome has no conversation chat surface", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const js = await chromeClientSource();
 
-  assert.match(html, /id="chatLog"/);
-  assert.match(html, /id="chatInput"/);
-  assert.match(js, /agent-reply/);
+  assert.doesNotMatch(html, /id="chatLog"/);
+  assert.doesNotMatch(html, /id="chatInput"/);
+  assert.doesNotMatch(html, /<h2>Conversation<\/h2>/);
+  assert.doesNotMatch(html, /"initialChat":/);
+  assert.doesNotMatch(js, /agent-reply/);
+  assert.doesNotMatch(js, /chat-sync/);
+  assert.doesNotMatch(js, /agentPresence/);
 });
 
-test("chrome bootstraps persisted chat history so missed replies still appear", () => {
-  const html = createChromeHtml({
-    key: "abc",
-    file: "/tmp/artifact.html",
-    chat: [{ role: "agent", text: "Persisted reply", at: "2026-05-11T00:00:00.000Z" }],
-  });
+test("chrome queues annotations into a floating dock instead of a side panel", async () => {
+  const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
+  const js = await chromeClientSource();
+  const css = await chromeCssSource();
 
-  assert.match(html, /"initialChat":/);
-  assert.match(html, /Persisted reply/);
+  assert.doesNotMatch(html, /class="panel"/);
+  assert.match(html, /class="dock" id="dock" hidden/);
+  assert.match(html, /id="dockCount"/);
+  assert.match(html, /id="annotationPills"/);
+  // The dock floats over a full-width artifact and only shows while there is something queued.
+  assert.match(css, /\.dock\{[^}]*position:absolute/);
+  assert.match(js, /function updateDock\(\)/);
+  assert.match(js, /dock\.hidden = ended \|\| count === 0/);
 });
 
-test("chrome client renders persisted chat history", async () => {
+test("chrome disables sending only while ended", async () => {
   const js = await chromeClientSource();
 
-  assert.match(js, /initialChat\.forEach/);
-});
-
-test("chrome can sync persisted chat after the event stream reconnects", async () => {
-  const js = await chromeClientSource();
-
-  assert.match(js, /chat-sync/);
-  assert.match(js, /function syncChat/);
-});
-
-test("chrome shows agent working state when a previous poll has released", async () => {
-  const js = await chromeClientSource();
-
-  assert.match(js, /agent-presence/);
-  assert.match(js, /Working\.\.\./);
-  assert.match(js, /spinner/);
-});
-
-test("chrome disables sending only while working or ended", async () => {
-  const js = await chromeClientSource();
-
-  assert.match(js, /let agentPresence = "waiting"/);
   assert.match(js, /function updateSendState\(\)/);
-  assert.match(js, /sendButton\.disabled = ended \|\| agentPresence === "working"/);
-  assert.match(js, /sendCaret\.disabled = ended \|\| agentPresence === "working"/);
+  assert.match(js, /sendButton\.disabled = ended/);
+  assert.match(js, /sendCaret\.disabled = ended/);
+  assert.doesNotMatch(js, /agentPresence/);
   assert.doesNotMatch(js, /hasContent/);
 });
 
-test("sending with an empty composer nudges instead of blocking", async () => {
+test("sending with an empty queue nudges instead of blocking", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const js = await chromeClientSource();
   const css = await chromeCssSource();
 
-  assert.match(html, /class="send-hint" id="sendHint" hidden>Write a message or annotate an element first\.</);
+  assert.match(html, /class="send-hint" id="sendHint" hidden>Annotate an element to queue feedback first\.</);
   assert.match(js, /function showSendHint\(\)/);
   assert.match(js, /sendHint\.hidden = false/);
-  assert.match(js, /chatInput\.focus\(\)/);
+  assert.doesNotMatch(js, /chatInput/);
   assert.match(css, /\.send-hint\{/);
 });
 
-test("composer send is a split button with a send-and-end option", async () => {
+test("dock send is a split button with a send-and-end option", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const css = await chromeCssSource();
 
-  assert.match(html, /class="button send-main" id="send">Send to Agent</);
+  assert.match(html, /class="button send-main" id="send">Send</);
   assert.match(html, /class="button send-caret" id="sendCaret"/);
   assert.match(html, /class="menu send-menu" id="sendMenu" hidden/);
   assert.match(html, /id="sendAndEnd"[^<]*>.*Send &amp; end session/);
   assert.match(css, /\.send-main\{[^}]*border-radius:var\(--radius-md\) 0 0 var\(--radius-md\)/);
-  assert.match(css, /\.send-caret\{[^}]*border-left:1px solid rgba\(23,19,10,.22\)/);
+  assert.match(css, /\.send-caret\{[^}]*border-left:1px solid rgba\(17,17,27,.28\)/);
 });
 
 test("send and end submits queued prompts before ending the session", async () => {
@@ -532,18 +536,17 @@ test("chrome only marks session ended after the end request succeeds", async () 
   assert.match(js, /if \(!response\.ok\) throw new Error\("failed to end session"\);\n {2}ended = true/);
 });
 
-test("chrome shows a waiting banner when no agent has attached", async () => {
+test("chrome has no agent-presence banner", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const js = await chromeClientSource();
   const css = await chromeCssSource();
 
-  assert.match(html, /id="presenceBanner"/);
-  assert.match(html, /Your agent is not listening/);
-  assert.match(js, /presenceBanner\.hidden = ended \|\| agentPresence !== "waiting"/);
-  assert.match(css, /\.presence-banner\{/);
+  assert.doesNotMatch(html, /id="presenceBanner"/);
+  assert.doesNotMatch(js, /presenceBanner/);
+  assert.doesNotMatch(css, /\.presence-banner\{/);
 });
 
-test("chrome puts queued annotations inside the chat composer as preview pills", async () => {
+test("chrome puts queued annotations inside the floating dock as preview pills", async () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
   const js = await chromeClientSource();
   const css = await chromeCssSource();
@@ -589,15 +592,15 @@ test("chrome omits the extra conversation description copy", () => {
   assert.doesNotMatch(html, /Annotate elements in the artifact, or write a freeform message below/);
 });
 
-test("composer textarea is sized within the right panel", async () => {
+test("dock floats over a full-width artifact", async () => {
   const css = await chromeCssSource();
 
   assert.match(css, /\.layout\{[^}]*min-height:0/);
-  assert.match(css, /\.panel\{[^}]*min-height:0/);
-  assert.match(css, /\.chat\{[^}]*min-height:0/);
-  assert.match(css, /\.composer\{[^}]*min-width:0/);
-  assert.match(css, /\.composer\{[^}]*flex-shrink:0/);
-  assert.match(css, /\.composer textarea\{[^}]*box-sizing:border-box/);
+  assert.doesNotMatch(css, /\.layout\{[^}]*grid-template-columns/);
+  assert.match(css, /\.frame\{[^}]*width:100%/);
+  assert.match(css, /\.dock\{[^}]*position:absolute/);
+  assert.match(css, /\.dock\{[^}]*box-shadow:var\(--shadow-floating\)/);
+  assert.match(css, /\.dock\[hidden\]\{display:none/);
 });
 
 test("hot reload resets iframe src instead of crossing sandbox location", async () => {
@@ -963,11 +966,8 @@ test("/chrome.css serves the extracted chrome stylesheet", async () => {
 
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type") || "", /text\/css/);
-    assert.match(normalizeCssForAssertions(body), /--ink-900:#0f1115/);
-    assert.match(
-      normalizeCssForAssertions(body),
-      /\.layout\{[^}]*grid-template-columns:minmax\(0,1fr\) ?var\(--panel-w\)/,
-    );
+    assert.match(normalizeCssForAssertions(body), /--ctp-base:#1e1e2e/);
+    assert.match(normalizeCssForAssertions(body), /\.dock\{[^}]*position:absolute/);
   } finally {
     await server.close();
     await rm(dir, { recursive: true, force: true });
@@ -1717,8 +1717,8 @@ test("ended session shows an overlay card over the dimmed chrome", async () => {
   assert.match(html, /Return to your agent to continue\./);
   assert.match(html, /class="ended-copy">\/tmp\/artifact\.html</);
   assert.doesNotMatch(html, /The agent polling loop can stop\./);
-  assert.match(css, /\.ended-overlay\{[^}]*inset:var\(--bar-h\) 0 0 0/);
-  assert.match(css, /\.ended-overlay\{[^}]*background:rgba\(15,17,21,.86\)/);
+  assert.match(css, /\.ended-overlay\{[^}]*inset:0/);
+  assert.match(css, /\.ended-overlay\{[^}]*background:rgba\(17,17,27,.82\)/);
   assert.match(css, /\.ended-title\{[^}]*font-family:var\(--font-serif\)/);
   assert.match(js, /endedOverlay\.hidden = false/);
   assert.match(js, /annotationSwitch\.disabled = true/);
@@ -1768,11 +1768,10 @@ test("annotation card queues and sends immediately on Ctrl+Enter or Cmd+Enter", 
   assert.match(js, /\.lavish-annotation-card \.lavish-hint\{/);
 });
 
-test("chrome client chat input sends on Enter and inserts newline on Shift+Enter", async () => {
+test("chrome client send button submits the queue", async () => {
   const js = await chromeClientSource();
 
-  assert.match(js, /chatInput\.addEventListener\(["']keydown["']/);
-  assert.match(js, /event\.key === ["']Enter["'] && !event\.shiftKey/);
-  assert.match(js, /event\.preventDefault\(\)/);
-  assert.match(js, /sendQueued\(\)/);
+  assert.doesNotMatch(js, /chatInput/);
+  assert.match(js, /sendButton\.onclick = \(\) => sendQueued\(false\)/);
+  assert.match(js, /if \(msg\.type === "lavish:sendQueuedPrompts"\) sendQueued\(\)/);
 });
