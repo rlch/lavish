@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -40,8 +41,12 @@ export function hostForUrl(host) {
   return host;
 }
 
+export function defaultStateDir() {
+  return path.join(os.homedir(), ".lavish");
+}
+
 export function stateDir() {
-  return process.env.LAVISH_AXI_STATE_DIR || path.join(os.homedir(), ".lavish");
+  return process.env.LAVISH_AXI_STATE_DIR || defaultStateDir();
 }
 
 export function stateFile() {
@@ -56,6 +61,13 @@ export async function ensureStateDir() {
   await mkdir(stateDir(), { recursive: true });
 }
 
-export function defaultPort() {
-  return Number(process.env.LAVISH_AXI_PORT || 4387);
+// One lavish server multiplexes every artifact under a given state dir, so the common case
+// (default state dir) keeps the canonical 4387 and shares one server. An isolated instance
+// only has to set LAVISH_AXI_STATE_DIR — its port is derived deterministically from that dir,
+// so two isolated instances never collide on 4387. LAVISH_AXI_PORT pins an exact port.
+export function defaultPort(env = process.env) {
+  if (env.LAVISH_AXI_PORT) return Number(env.LAVISH_AXI_PORT);
+  const dir = env.LAVISH_AXI_STATE_DIR || defaultStateDir();
+  if (dir === defaultStateDir()) return 4387;
+  return 4388 + (crypto.createHash("sha256").update(dir).digest().readUInt16BE(0) % 1000);
 }
