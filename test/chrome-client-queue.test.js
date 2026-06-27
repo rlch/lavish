@@ -358,7 +358,7 @@ test("layout gate timeout reveals with a persistent layout issue banner", async 
   assert.equal(chrome.element("layoutGateOverlay").hidden, true);
   assert.equal(chrome.element("body").classList.contains("layout-gate-active"), false);
   assert.equal(chrome.element("layoutIssueBanner").hidden, false);
-  assert.match(chrome.element("layoutIssueBanner").textContent, /may have layout issues/);
+  assert.match(chrome.element("layoutIssueBanner").title, /may have layout issues/);
 });
 
 test("layout gate timeout re-arms on reload", async () => {

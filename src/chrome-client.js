@@ -321,7 +321,8 @@ function isErrorLayoutWarning(warning) {
 
 function setLayoutIssueBanner(visible, text = "This surface may have layout issues. Your agent has been notified.") {
   if (!layoutIssueBanner) return;
-  layoutIssueBanner.textContent = text;
+  // The badge is a bare alert icon; the explanation lives in the hover tooltip.
+  layoutIssueBanner.title = text;
   layoutIssueBanner.hidden = !visible;
 }
 
